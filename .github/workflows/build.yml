@@ -23,20 +23,24 @@ jobs:
       run: |
         unzip -o Daftar_Siyanat_Android_Project.zip -d extracted_project
 
-    - name: Make gradlew executable
-      run: |
-        find extracted_project -name "gradlew" -exec chmod +x {} \;
-
     - name: Build APK with Gradle
       run: |
-        PROJECT_DIR=$(find extracted_project -name "gradlew" -printf "%h\n" | head -n 1)
-        if [ -n "$PROJECT_DIR" ]; then
+        # البحث عن المجلد الذي يحتوي على ملف build.gradle أو build.gradle.kts
+        BUILD_FILE=$(find extracted_project -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+        if [ -n "$BUILD_FILE" ]; then
+          PROJECT_DIR=$(dirname "$BUILD_FILE")
           cd "$PROJECT_DIR"
-          ./gradlew assembleDebug --stacktrace
+          
+          # إذا كان gradlew موجوداً نستخدمه، وإلا نستخدم gradle المثبت في السيرفر
+          if [ -f "./gradlew" ]; then
+            chmod +x gradlew
+            ./gradlew assembleDebug --stacktrace
+          else
+            gradle assembleDebug --stacktrace
+          fi
         else
-          echo "gradlew not found, trying root directory..."
-          cd extracted_project
-          gradle assembleDebug
+          echo "Error: No build.gradle file found in the zip archive!"
+          exit 1
         fi
 
     - name: Upload APK
@@ -44,3 +48,4 @@ jobs:
       with:
         name: app-debug
         path: '**/build/outputs/apk/debug/*.apk'
+        
