@@ -23,11 +23,21 @@ jobs:
       run: |
         unzip -o Daftar_Siyanat_Android_Project.zip -d extracted_project
 
+    - name: Make gradlew executable
+      run: |
+        find extracted_project -name "gradlew" -exec chmod +x {} \;
+
     - name: Build APK with Gradle
       run: |
-        cd extracted_project/* || cd extracted_project
-        chmod +x gradlew || true
-        ./gradlew assembleDebug --stacktrace || gradle assembleDebug
+        PROJECT_DIR=$(find extracted_project -name "gradlew" -printf "%h\n" | head -n 1)
+        if [ -n "$PROJECT_DIR" ]; then
+          cd "$PROJECT_DIR"
+          ./gradlew assembleDebug --stacktrace
+        else
+          echo "gradlew not found, trying root directory..."
+          cd extracted_project
+          gradle assembleDebug
+        fi
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
