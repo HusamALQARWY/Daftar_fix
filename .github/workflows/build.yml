@@ -10,67 +10,46 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: temurin
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
 
-      - name: Unzip project archive
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ZIP_FILE=$(find . -maxdepth 1 -type f -name "*.zip" | head -n 1)
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "Error: No ZIP file found in repository root."
-            exit 1
-          fi
-
-          mkdir -p extracted_project
+    - name: Unzip project archive
+      run: |
+        # العثور على أي ملف zip مرفوع وفك ضغطه تلقائياً بغض النظر عن اسمه
+        ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+        if [ -n "$ZIP_FILE" ]; then
+          echo "Unzipping $ZIP_FILE..."
           unzip -o "$ZIP_FILE" -d extracted_project
+        else
+          echo "Error: No .zip file found in root directory!"
+          exit 1
+        fi
 
-      - name: Locate Android project
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          SETTINGS_FILE=$(find extracted_project -type f \
-            \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
-            | head -n 1)
-
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo "Error: Android project settings file not found."
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Found project: $PROJECT_DIR"
-
-      - name: Build APK
-        shell: bash
-        run: |
-          set -euo pipefail
+    - name: Build APK with Gradle
+      run: |
+        BUILD_FILE=$(find extracted_project -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+        if [ -n "$BUILD_FILE" ]; then
+          PROJECT_DIR=$(dirname "$BUILD_FILE")
           cd "$PROJECT_DIR"
+          
+          # إجبار التحديث إلى إصدار Gradle 8.9 المتوافق
+          gradle wrapper --gradle-version 8.9
+          
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+        else
+          echo "Error: No build file found inside the extracted zip!"
+          exit 1
+        fi
 
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            ./gradlew assembleDebug --stacktrace
-          else
-            echo "Error: Gradle Wrapper (gradlew) is missing."
-            echo "Include gradlew and gradle/wrapper in the ZIP."
-            exit 1
-          fi
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: extracted_project/**/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug
+        path: '**/build/outputs/apk/debug/*.apk'
