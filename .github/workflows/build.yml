@@ -23,39 +23,20 @@ jobs:
       run: |
         unzip -o Daftar_Siyanat_Android_Project.zip -d extracted_project
 
-    - name: Fix and Build APK with Gradle
+    - name: Build APK with Gradle
       run: |
         BUILD_FILE=$(find extracted_project -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
         if [ -n "$BUILD_FILE" ]; then
           PROJECT_DIR=$(dirname "$BUILD_FILE")
           cd "$PROJECT_DIR"
           
-          # إجبار التحديث إلى إصدار Gradle 8.9
+          # تحديث ملف الـ wrapper إلى إصدار متوافق 8.9
           gradle wrapper --gradle-version 8.9
           
-          # إضافة حل لتجاوز مشكلة الكلاسات والملفات المكررة تلقائياً
-          echo "" >> build.gradle
-          echo "subprojects {" >> build.gradle
-          echo "    afterEvaluate { project ->" >> build.gradle
-          echo "        if (project.hasProperty('android')) {" >> build.gradle
-          echo "            project.android {" >> build.gradle
-          echo "                packagingOptions {" >> build.gradle
-          echo "                    resources.excludes.add('META-INF/*')" >> build.gradle
-          echo "                }" >> build.gradle
-          echo "            }" >> build.gradle
-          echo "        }" >> build.gradle
-          echo "    }" >> build.gradle
-          echo "}" >> build.gradle
-          echo "tasks.configureEach { task ->" >> build.gradle
-          echo "    if (task.name.contains('CheckDuplicateClasses')) {" >> build.gradle
-          echo "        task.enabled = false" >> build.gradle
-          echo "    }" >> build.gradle
-          echo "}" >> build.gradle
-          
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --stacktrace -Pandroid.enableJetifier=true -Pandroid.useAndroidX=true
         else
-          echo "Error: No build.gradle file found in the project!"
+          echo "Error: No build file found!"
           exit 1
         fi
 
